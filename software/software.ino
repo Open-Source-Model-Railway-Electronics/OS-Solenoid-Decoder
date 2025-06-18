@@ -49,7 +49,6 @@ LedBlink    rightLed( rightLedPin) ;
 LedBlink    leftLed(  leftLedPin ) ;
 BlinkTimer  commitStates ;
 
-const int DEADBEEF_EE_ADDRESS    = 1020 ; // 1020, 1021, 1022, 1023
 const int CDU_RESET_EE_ADDRESS   = 1019 ;
 const int MAX_VOLTAGE_EE_ADDRESS = 1018 ;
 
@@ -73,7 +72,7 @@ const int LOCO_FUNCTIONS_OFF = 0 ;
 const int FANTASTIC_FOUR     = 1 ;
 const int EIGHT_BALL         = 2 ;
 
-struct
+typedef struct
 {
     uint16 uniqueAddresses :  1 ;
     uint16          dccExt :  1 ; 
@@ -84,7 +83,19 @@ struct
     // I used double addresses so any system can turn on or off this setting. Address 1001 and 997 both turn it ON
     // addresses 1000 and 996 turn it OFF.
     // the default = ON
-} settings;
+} Settings ;
+
+Settings defaultSettings =
+{
+    .uniqueAddresses = 0,
+    .dccExt          = 0,
+    .locoFunctions   = LOCO_FUNCTIONS_OFF,
+    .maxCduVoltage   = 0,
+    .hasCdu          = 0,
+    .rcn213          = 1
+} ;
+
+Settings settings ;
 
 struct // these struct is only used to save and load critical variable to and fom EEPROM
 {
@@ -232,14 +243,24 @@ void updateCduVoltage()
     }
 }
 
+uint8_t deadbeef()
+{
+    const int DEADBEEF_EE_ADDRESS = 1020 ;
+    uint32 DEADBEEF ;
+    EEPROM.get( DEADBEEF_EE_ADDRESS, DEADBEEF ) ;
+
+    if( DEADBEEF != 0xDEADBEEF )
+    {   DEADBEEF  = 0xDEADBEEF ;
+
+        EEPROM.put( DEADBEEF_EE_ADDRESS, DEADBEEF ) ;
+        return 1 ;
+    }
+
+    return 0 ;
+}
 
 void setup()
 {
-    // delay(1);
-    // Serial.begin(115200);
-    // delay(1);
-    // Serial.println(F("booting OSSD MK2"));
-
     commitStates.setTime( 1000 ) ;
     configButton.begin( configPin ) ;
 
@@ -251,21 +272,10 @@ void setup()
     rightLed.begin();
      leftLed.begin();
 
-    uint32 DEADBEEF ;
-    EEPROM.get( DEADBEEF_EE_ADDRESS, DEADBEEF ) ;
+    if( deadbeef() )
+    {   
+        EEPROM.put( EE_SETTINGS, defaultSettings ) ;
 
-    if( DEADBEEF != 0xDEADBEEF )
-    {   DEADBEEF  = 0xDEADBEEF ;
-
-        EEPROM.put( DEADBEEF_EE_ADDRESS, DEADBEEF ) ;
-
-        settings.dccExt          = 0 ;  
-        settings.locoFunctions   = LOCO_FUNCTIONS_OFF ;
-        settings.uniqueAddresses = 0 ;
-        settings.maxCduVoltage   = 0 ;
-        settings.rcn213          = 1 ;                         // default use normal address
-        EEPROM.put( EE_SETTINGS, settings ) ;
-        
         for( int i = 0 ; i < nCoils ; i ++ )
         {
             coil[i].setType( DOUBLE_COIL_PULSED ) ; 
@@ -278,7 +288,6 @@ void setup()
     }
 
     EEPROM.get( EE_SETTINGS, settings ) ;
-
     loadCoils() ;
     
     dcc.pin( 2, 0 ) ;
@@ -300,24 +309,24 @@ void loop()
 
     config() ;
 
-    // REPEAT_MS( 1 ) NEED TESTING
-    // {
-    //     int sample = analogRead( currentSensePin ) ;
-    //     if( sample >= ADC_max )                 // if shortcircuit...
-    //     {
-    //         for( int i = 0 ; i < nGpio ; i ++ )
-    //         {
-    //             digitalWrite( GPIO[i], LOW ) ;  // kill all outputs
-    //         }
+    REPEAT_MS( 1 )// NEED TESTING
+    {
+        int sample = analogRead( currentSensePin ) ;
+        if( sample >= ADC_max )                 // if shortcircuit...
+        {
+            for( int i = 0 ; i < nGpio ; i ++ )
+            {
+                digitalWrite( GPIO[i], LOW ) ;  // kill all outputs
+            }
 
-    //         rightLed.setEventBleeps(5) ;            // go flash LED's
-    //         leftLed.setEventBleeps(5) ;
+            rightLed.setEventBleeps(5) ;            // go flash LED's
+            leftLed.setEventBleeps(5) ;
 
-    //         runMode = 0 ;                       // set lockout time of atleast 5 seconds.
-    //         lockoutTime = millis() ;
-    //     }
-    // }
-    // END_REPEAT
+            runMode = 0 ;                       // set lockout time of atleast 5 seconds.
+            lockoutTime = millis() ;
+        }
+    }
+    END_REPEAT
     
 
     if( runMode == 0 && (millis() - lockoutTime) >= 5001 ) { runMode = 1 ; } // after 5 seconds reinstate outputs.
@@ -325,14 +334,18 @@ void loop()
     if( runMode == 1 )
     {
         static uint8 index = 0 ;
+        static bool activated = false ;      
+
+        int voltage = analogRead( coilVoltagePin ) ; // max ADC should be 12.
+        if( settings.hasCdu == 0
+        ||  (!activated && voltage >= (settings.maxCduVoltage * 9 / 10)) )  activated = true ;// above 90% is good to switch
         
-        // int voltage = analogRead( coilVoltagePin ) ; // NEED TESTING
-        //if( voltage >= (settings.maxCduVoltage * 9 / 10) ) // above 90% is good to switch
+        if( activated )
         {
-            
             if( coil[index].update() )
             {   
                 iterate( index, nCoils ) ; // iterate to next coil if conditions allow for it.
+                activated = false ;
             }
         }
     }
