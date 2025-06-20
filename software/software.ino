@@ -609,10 +609,10 @@ void config()
 
             if( receivedAddress ==  5 ) for( i = 0 ; i < (nCoils/2) ; i ++ ) // preset 5, 4x double coil (right side) and 4x double relay (left side) for dual relay frog juicing
             {
-                coil[i].setType( DOUBLE_PULSE_W_FROG ) ;
-                coil[i].setPulseTime( DEF_DOUBLE_PULSE_TIME ) ; // default to 50ms
-                coil[i].setDutyCycle( DEF_DUTYCYCLE ) ; // ON
-                coil[i].reset() ;
+                coil[ i ].setType( DOUBLE_PULSE_W_FROG ) ;
+                coil[ i ].setPulseTime( DEF_DOUBLE_PULSE_TIME ) ; // default to 50ms
+                coil[ i ].setDutyCycle( DEF_DUTYCYCLE ) ; // ON
+                coil[ i ].reset() ;
                 coil[i+4].setType( DORMENT ) ; // disable coil objects on the opposite side
                 coil[i+4].reset() ;
             }
