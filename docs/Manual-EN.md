@@ -15,35 +15,63 @@ This decoder is designed to be:
 Whether you're building a large layout or just want something that works without hassle: this decoder is made to get the job done, without needing a degree in electronics.
 
 ## Table of Contents
-📘 Introduction	1
-🔧 Features	3
-🔌 Connecting the Decoder	5
-🔋 Power Supply	5
-⚡ Solenoid Outputs	5
-🔌 Relay Extension – Unifrog Polarization	7
-⚡ Relay Extension – Electrofrog Polarization	9
-⚙️ Relay Extension – Open Contact (General Purpose)	11
-🧲 Decouplers and Other Inductive Loads	12
-⚙️ Configuring the OS-Solenoid-Decoder	13
-🔦 LED Behavior in Operating Mode	13
-If you use mixed output types, the left LED stays ON, and the right LED blinks once continuously to indicate mixed config mode.	13
-🧰 Entering Configuration Mode	13
-🧠 Before You Start	15
-📖 Menu Overview	15
-🟠 Menu 1: DCC Address Assignment	16
-Rules:	16
-Selecting outputs:	16
-🟡 Menu 2: Output Type Selection	17
- In Electrofrog mode, outputs 1–4 control the relays on outputs 8–5 in reversed order (1→8, 2→7, etc.).	17
-🔵 Menu 3: Pulse Time Configuration	18
-For Single Pulse:	18
-For Double Pulse:	18
-🟣 Menu 4: PWM Duty Cycle	19
-Use address 9 to apply the same duty cycle to all outputs.	19
-🔘 Menu 5: Global Settings & Presets	20
-Presets (Set all output types at once)	20
-Special Options	20
-📟 Loco Function Control Explained	21
+📘 Introduction
+
+🔧 Features	
+
+🔌 Connecting the Decoder	
+
+🔋 Power Supply	
+
+⚡ Solenoid Outputs	
+
+🔌 Relay Extension – Unifrog Polarization	
+
+⚡ Relay Extension – Electrofrog Polarization	
+
+⚙️ Relay Extension – Open Contact (General Purpose)	
+
+🧲 Decouplers and Other Inductive Loads	
+
+⚙️ Configuring the OS-Solenoid-Decoder	
+
+🔦 LED Behavior in Operating Mode	
+
+If you use mixed output types, the left LED stays ON, and the right LED blinks once continuously to indicate mixed config mode.	
+
+🧰 Entering Configuration Mode	
+
+🧠 Before You Start	
+
+📖 Menu Overview	
+
+🟠 Menu 1: DCC Address Assignment	
+
+Rules:	
+
+Selecting outputs:	
+
+🟡 Menu 2: Output Type Selection	
+
+ In Electrofrog mode, outputs 1–4 control the relays on outputs 8–5 in reversed order (1→8, 2→7, etc.).	
+
+🔵 Menu 3: Pulse Time Configuration	
+
+For Single Pulse:	
+
+For Double Pulse:	
+
+🟣 Menu 4: PWM Duty Cycle	
+
+Use address 9 to apply the same duty cycle to all outputs.	
+
+🔘 Menu 5: Global Settings & Presets	
+
+Presets (Set all output types at once)	
+
+Special Options	
+
+📟 Loco Function Control Explained	
 
 ---
 
