@@ -14,7 +14,7 @@ void updatePwm()
     {
         if( ++counter == 10 ) counter = 0 ;
 
-        for( uint8_t i = 0; i < activePins; i++ )
+        for( uint8_t i = 0; i < MAX_PWM_PINS; i++ )
         {
             if( pwmPins[i].pin == INACTIVE ) continue;  // Skip inactive slots
 

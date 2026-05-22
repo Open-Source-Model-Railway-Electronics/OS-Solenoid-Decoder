@@ -98,8 +98,8 @@ void CoilDriver::turn( uint8 pin, uint8 newState )
 
     else                                // all other modes may make use of PWM
     {
-        if( newState == 1 ) {   subscribePwm( pinA, dutycycle ) ; } 
-        else                { unsubscribePwm( pinB ) ;            } 
+        if( newState == 1 ) { subscribePwm( pin, dutycycle ) ; }
+        else                { unsubscribePwm( pin ) ;          }
     }
 }
 
@@ -107,7 +107,7 @@ uint8 CoilDriver::update()
 {
     if( type == DORMENT )  return 1 ;
 
-    if( lockoutTimer.update( lockout ) ) { lockout = 1 ; }
+    if( lockoutTimer.update( lockout ) ) { lockout = 0 ; }
     
     static uint8_t sharedToken =  FREE ;
 
@@ -129,36 +129,41 @@ uint8 CoilDriver::update()
         state2beB      = 0 ;
     }
 
-    // if I am not double pulse, I can always have my own token, and leave the shared token free for others to use. Also update ouputs at once
-    if( !((type == DOUBLE_PULSE_W_FROG) || (type == DOUBLE_COIL_PULSED)) )
-    { 
-        myToken        = IN_POSESSION ;      
-        outputStateA   =    state2beA ;
-        outputStateB   =    state2beB ;
-
-        state2beA      = 0 ;
-        state2beB      = 0 ;
+    // continuous types: desired state persists until a new command changes it
+    if( type == SINGLE_COIL_CONTINUOUSLY || type == DOUBLE_COIL_CONTINUOUSLY )
+    {
+        outputStateA = state2beA ;
+        outputStateB = state2beB ;
     }
-    
-    // only used for pulsed modi. Timer is examined here to check when the pulse needs to to be stopped.
+
+    // single pulsed: latch new state only when output is idle, so an in-progress pulse is not interrupted
+    if( type == SINGLE_COIL_PULSED )
+    {
+        if( outputStateA == 0 ) { outputStateA = state2beA ; state2beA = 0 ; }
+        if( outputStateB == 0 ) { outputStateB = state2beB ; state2beB = 0 ; }
+    }
+
     timerA.update( outputStateA ) ;
     timerB.update( outputStateB ) ;
 
-    if( myToken == IN_POSESSION 
-                && 
-    (   type    ==   SINGLE_COIL_PULSED
-    ||  type    ==   DOUBLE_COIL_PULSED 
-    ||  type    ==   DOUBLE_PULSE_W_FROG ) )
+    // single pulsed: timer terminates the pulse, no token involved
+    if( type == SINGLE_COIL_PULSED )
     {
-        if( timerA.Q ) { outputStateA = 0 ; } // when timer expires states become 0
+        if( timerA.Q ) { outputStateA = 0 ; }
+        if( timerB.Q ) { outputStateB = 0 ; }
+    }
+
+    // double pulsed: token is released when both outputs go idle
+    if( myToken == IN_POSESSION
+    && (type == DOUBLE_COIL_PULSED || type == DOUBLE_PULSE_W_FROG) )
+    {
+        if( timerA.Q ) { outputStateA = 0 ; }
         if( timerB.Q ) { outputStateB = 0 ; }
 
-        // a double pulsed coil must release the Token 
-        if( (type == DOUBLE_COIL_PULSED || type == DOUBLE_PULSE_W_FROG)
-        &&  outputStateA == 0 && outputStateB == 0 )  
-        {  
-            myToken     = FREE;  
-            sharedToken = FREE;
+        if( outputStateA == 0 && outputStateB == 0 )
+        {
+            myToken     = FREE ;
+            sharedToken = FREE ;
         }
     }
 
@@ -199,8 +204,8 @@ uint8_t CoilDriver::setCoilExt( uint16 dccAddress, uint8 _aspect )
     uint16  secondaryAddress = primaryAddress + 1 ;
     uint32         pulseTime = _aspect * 1000 ; // aspect number is used for pulse length in seconds.
 
-    if( dccAddress ==   primaryAddress ) { timerA.setTime( pulseTime ) ; outputStateA = 1 ; return 1 ; }
-    if( dccAddress == secondaryAddress ) { timerB.setTime( pulseTime ) ; outputStateB = 1 ; return 1 ; }
+    if( dccAddress ==   primaryAddress ) { timerA.setTime( pulseTime ) ; state2beA = 1 ; return 1 ; }
+    if( dccAddress == secondaryAddress ) { timerB.setTime( pulseTime ) ; state2beB = 1 ; return 1 ; }
 
     return 0 ;
 }
@@ -214,9 +219,9 @@ void CoilDriver::setStates( uint8_t A, uint8_t B )
 
 uint8 CoilDriver::setCoil( uint16 dccAddress, uint8 dir, uint8 override )
 {
-    if( lockout == 0 && ! override )    {  return 0 ; }
+    if( lockout == 1 && ! override )    {  return 0 ; }
     if( type    == DORMENT )            {  return 0 ; }
-    else                                {  lockout = 0 ; }
+    else                                {  lockout = 1 ; }
     
     uint16 primaryAddress   = myAddress ;
     uint16 secondaryAddress = myAddress + 1 ;
@@ -225,8 +230,10 @@ uint8 CoilDriver::setCoil( uint16 dccAddress, uint8 dir, uint8 override )
     {
     
     case SINGLE_COIL_CONTINUOUSLY:
-        oldStateA = state2beA ;
-        oldStateB = state2beB ;
+        if( dccAddress ==   primaryAddress ) { state2beA = dir ; oldStateA = dir ; return 1 ; }
+        if( dccAddress == secondaryAddress ) { state2beB = dir ; oldStateB = dir ; return 1 ; }
+        return 0 ;
+
     case SINGLE_COIL_PULSED:
         if( dccAddress ==   primaryAddress ) { state2beA = dir ; return 1 ; }
         if( dccAddress == secondaryAddress ) { state2beB = dir ; return 1 ; }
@@ -235,14 +242,16 @@ uint8 CoilDriver::setCoil( uint16 dccAddress, uint8 dir, uint8 override )
     case DOUBLE_COIL_CONTINUOUSLY:
     case DOUBLE_PULSE_W_FROG:
     case DOUBLE_COIL_PULSED:
-        if( dccAddress != primaryAddress ) break ;  
+        if( dccAddress != primaryAddress ) break ;
         state2beA = !dir ; oldStateA = state2beA ;
         state2beB =  dir ; oldStateB = state2beB ;
         return 1 ;
-    
+
     default:
         return 0 ;
     }
+
+    return 0 ;
 }
 
 uint8  CoilDriver::getState( uint8_t channel ) { if( channel == 0 ) return oldStateA ;
@@ -254,7 +263,7 @@ uint8  CoilDriver::getType() { return type ; }
 void   CoilDriver::setAddress( uint16 _address ) { myAddress = _address ; }
 uint16 CoilDriver::getAddress() { return myAddress ; }
 
-uint16 CoilDriver::getPulseTime() { return myPulseTime ; }
+uint32 CoilDriver::getPulseTime() { return myPulseTime ; }
 void   CoilDriver::setPulseTime( uint32 _pulseTime )
 {
     myPulseTime = _pulseTime ;
@@ -264,3 +273,38 @@ void   CoilDriver::setPulseTime( uint32 _pulseTime )
 
 void   CoilDriver::setDutyCycle( uint8_t _dutycycle ) { dutycycle = _dutycycle ; }
 uint8  CoilDriver::getDutyCycle() { return dutycycle ; }
+
+void CoilDriver::recover()
+{
+    // Called after an external GPIO kill (e.g. short-circuit protection).
+    // The physical outputs are already LOW. Resync internal state so that
+    // the next update() call correctly drives outputs back to their desired state.
+
+    outputStateA = 0 ;
+    outputStateB = 0 ;
+
+    // Reset trigger memory so the 0 -> desired-state edges are detected on
+    // the very next update() call instead of being silently swallowed.
+    riseA.old = 0 ;  fallA.old = 0 ;
+    riseB.old = 0 ;  fallB.old = 0 ;
+
+    // For continuous types: reload state2be from the last saved state so
+    // update() will immediately transition the output back on.
+    if( type == SINGLE_COIL_CONTINUOUSLY || type == DOUBLE_COIL_CONTINUOUSLY )
+    {
+        state2beA = oldStateA ;
+        state2beB = oldStateB ;
+    }
+
+    // For DOUBLE_PULSE_W_FROG: the GPIO kill also cleared the frog relay pins.
+    // Restore them to the last known state.
+    if( type == DOUBLE_PULSE_W_FROG )
+    {
+        digitalWrite( buddyPinA, oldStateA ) ;
+        digitalWrite( buddyPinB, oldStateB ) ;
+    }
+
+    // Note: if a double-pulsed coil held myToken mid-pulse, outputStateA/B are
+    // now both 0. The token-release block inside update() will free the token
+    // on the very next update() call automatically — no action needed here.
+}

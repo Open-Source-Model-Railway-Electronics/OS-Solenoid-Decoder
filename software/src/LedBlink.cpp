@@ -9,7 +9,6 @@ void LedBlink::begin()
 {
     pinMode( pin, OUTPUT ) ;
     digitalWrite( pin, LOW );
-    Serial.println("beginning led");
 }
 
 void LedBlink::bleep( uint8_t _count )
@@ -102,11 +101,8 @@ void LedBlink::update()
                 break ;
 
             case REALLY_FAST:
-                if( (cycleCounter % 1) == 0 )
-                {
-                    digitalWrite( pin, ledState ) ;
-                    ledState ^= 1 ;
-                }
+                digitalWrite( pin, ledState ) ;
+                ledState ^= 1 ;
                 break ;
             }
         }

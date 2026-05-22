@@ -26,9 +26,9 @@ public:
     void    begin( uint8, uint8 ) ;
     void    initializeCoils() ;
     void    reset() ;
+    void    recover() ;
     
     uint8   update() ;
-    void    turn( uint8 ) ;
 
     uint8   setCoilExt( uint16, uint8 ) ;
     uint8   setCoil(    uint16, uint8, uint8 ) ;
@@ -40,7 +40,7 @@ public:
     void    setAddress( uint16 ) ;
     uint16  getAddress() ;
     void    setPulseTime( uint32 ) ;
-    uint16  getPulseTime() ;
+    uint32  getPulseTime() ;
     void    setDutyCycle( uint8_t ) ;
     uint8_t getDutyCycle( ) ;
 
@@ -76,10 +76,9 @@ private:
     T_ON timerA ;
     T_ON timerB ;
     
-    T_OFF lockoutTimer ;
+    T_ON  lockoutTimer ;
     
     void  turn( uint8, uint8 ) ;
-    uint8 getPwmIndex( uint8 pinNumber ) ;
 } ;
 
 #endif

@@ -8,6 +8,8 @@
 #include "src/Timers.h"
 #include <EEPROM.h>
 #include "src/LedBlink.h"
+#include "src/Logger.h"
+#include "src/Simulator.h"
 
 
 
@@ -45,6 +47,8 @@ uint8       coilIndex = 0 ;
 NmraDcc     dcc ;
 CoilDriver  coil[nCoils] ;
 Debounce    configButton ;
+Logger      logger ;
+Simulator   sim ;
 LedBlink    rightLed( rightLedPin) ;
 LedBlink    leftLed(  leftLedPin ) ;
 BlinkTimer  commitStates ;
@@ -157,10 +161,10 @@ volatile uint8          newAddressSet ;
 volatile static uint32  lastTime ;
 
 // calculuse max ADC value that correspond with 5A, 1024 adc pulses and 0.125R shunt resistor CHECK ME
-static uint8 R_shunt  = 125 ;              // 0.0125R
-static uint8 I_max    =   5 ;              // ampere
-static uint8 V_max    =  R_shunt * I_max ; //  /100V
-static uint8 ADC_max  =  ((uint32)1024 * V_max) / ((uint32)5 * 10000) ;
+static uint8  R_shunt  = 125 ;                          // 0.0125R
+static uint8  I_max    =   5 ;                          // ampere
+static uint16 V_max    = (uint16)R_shunt * I_max ;      // prevent uint8 overflow (625 > 255)
+static uint8  ADC_max  = ((uint32)1024 * V_max) / ((uint32)5 * 10000) ;
 
 void determineLedPattern()
 {
@@ -259,15 +263,45 @@ uint8_t deadbeef()
     return 0 ;
 }
 
+void notifyLog( const __FlashStringHelper* name, uint32_t value )
+{
+    Serial.print( name ) ;
+    Serial.print( F(" -> ") ) ;
+    Serial.println( value ) ;
+}
+
 void setup()
 {
+    Serial.begin( 115200 ) ;
+
     commitStates.setTime( 1000 ) ;
     configButton.begin( configPin ) ;
 
-    for( int i = 0 ; i < 16 ; i ++ )
+    for( int i = 0 ; i < nGpio ; i ++ )
     {
         pinMode( GPIO[i], OUTPUT ) ;
     }
+
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 0] ), "GPIO01" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 1] ), "GPIO02" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 2] ), "GPIO03" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 3] ), "GPIO04" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 4] ), "GPIO05" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 5] ), "GPIO06" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 6] ), "GPIO07" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 7] ), "GPIO08" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 8] ), "GPIO09" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[ 9] ), "GPIO10" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[10] ), "GPIO11" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[11] ), "GPIO12" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[12] ), "GPIO13" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[13] ), "GPIO14" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[14] ), "GPIO15" ) ;
+    logger.SUBSCRIBE_BOOL( digitalRead( GPIO[15] ), "GPIO16" ) ;
+
+    // sim.ADD(  100,  "hold config button",  digitalWrite( configPin, LOW  ) ) ;  // 1
+    // sim.ADD( 3500,  "release button",       digitalWrite( configPin, HIGH ) ) ;  // 2
+    // sim.ADD(  200,  "send DCC address 1",   notifyDccAccTurnoutOutput( 1, 1, 1 ) ) ; // 3
 
     rightLed.begin();
      leftLed.begin();
@@ -297,15 +331,16 @@ void setup()
 
 void loop()
 {
-    determineLedPattern(); 
+    logger.Log() ;
+    sim.Run() ;
+
+    determineLedPattern();
     rightLed.update();
     leftLed.update();
     
     updatePwm() ;
 
     dcc.process() ;
-
-    // testRoutine() ; // simulate events to test things like menu and outputs
 
     config() ;
 
@@ -329,7 +364,11 @@ void loop()
     END_REPEAT
     
 
-    if( runMode == 0 && (millis() - lockoutTime) >= 5001 ) { runMode = 1 ; } // after 5 seconds reinstate outputs.
+    if( runMode == 0 && (millis() - lockoutTime) >= 5001 )
+    {
+        for( int i = 0 ; i < nCoils ; i++ ) { coil[i].recover() ; } // resync CoilDriver state after GPIO kill
+        runMode = 1 ;
+    }
 
     if( runMode == 1 )
     {
@@ -366,14 +405,14 @@ uint8_t squashAddresses()
     uint8  addressCount = nCoils ;
     uint16 riseAddress = coil[0].getAddress() ;
 
-    for( int i = 0 ; i < nCoils-1 ; i ++ ) 
+    for( int i = 0 ; i < nCoils ; i ++ )
     {
         uint8 prevType = coil[i].getType() ;
         if( prevType == SINGLE_COIL_CONTINUOUSLY
-        ||  prevType == SINGLE_COIL_PULSED ){ riseAddress += 2 ; addressCount ++ ; }
-        else                                { riseAddress += 1 ; }
+        ||  prevType == SINGLE_COIL_PULSED ) { riseAddress += 2 ; addressCount ++ ; }
+        else                                 { riseAddress += 1 ; }
 
-        coil[i+1].setAddress( riseAddress ) ;
+        if( i + 1 < nCoils ) { coil[i+1].setAddress( riseAddress ) ; }
     }
     return addressCount ;
 }
@@ -732,7 +771,7 @@ void notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uin
     oldState = newState ;
     if (changedBits == 0) return ;
 
-    for( int i = 0 ; i < maxFunctions+1 ; i++ ) // loop through all changedBits to set the coil.
+    for( int i = 0 ; i < maxFunctions ; i++ )    // loop through all changedBits to set the coil.
     {
         uint16_t andMask = 1 << i ;
         if(( changedBits & andMask ) == 0 ) continue ;
@@ -745,79 +784,5 @@ void notifyDccFunc( uint16_t Addr, DCC_ADDR_TYPE AddrType, FN_GROUP FuncGrp, uin
         {
             coil[j].setCoil( dccAddress, state, 1 ) ; // and feed the changed state of this address into all coils, override lockout time active
         }
-    }
-}
-
-static uint32_t prevtime = 0 ;
-static uint8_t  state1 = 0 ;
-uint8_t timeout( uint32_t interval ) 
-{
-    if( millis() - prevtime >= interval ) 
-    {       prevtime = millis() ;
-        
-        Serial.println( state1++ ) ;
-
-        return 1 ;
-    }
-    
-    return 0 ;
-}
-
-void testRoutine()  // this routine simulates button presses and incomming dcc addresses.
-{
-    switch( state1 )
-    {
-    case 0: if( timeout( 50100 ))
-        {   
-            Serial.println( "sending 3x command to test lockout" ) ;
-
-
-        }
-        break ;
-
-    case 1: if( timeout( 1000 ))
-        {
-            Serial.println( "sending 3x command to test lockout 1S later" ) ;
-
-        }
-        break ;
-         
-
-    case 2: if( timeout( 50100 ))
-        {
-            Serial.println( "sending 3x command to test lockout 5S later" ) ;
-
-
-        }
-        break ;
-        
-    case 3: if( timeout( 50100 ))
-        {
-        }
-        break ;
-        
-
-    case 4: if( timeout( 50100 ))
-        {
-        }
-        break ;
-        
-    case 5: if( timeout( 50100 ))
-        {
-        }
-        break ;
-
-    case 6: if( timeout( 600000 ))
-        {
-
-        }
-        break ;
-        
-    case 7: if( timeout( 6000 ))
-        {
-
-        }
-        break ;
-
     }
 }
