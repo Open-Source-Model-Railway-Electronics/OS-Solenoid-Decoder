@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+const int nCoils        =  8 ;
+
 const int GPIO[] =
 {
      9,  3,  5,  6, // GPIO01-GPIO04
