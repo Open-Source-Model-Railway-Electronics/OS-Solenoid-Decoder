@@ -17,6 +17,7 @@
  *   WAIT( expr )                           — hold until expr returns 1.
  *   JUMP( target )                         — unconditional jump to event <target>.
  *   CJUMP( expr, onFalse, onTrue )         — conditional jump.
+ *   WAIT_SERIAL_COMMAND( "cmd" )           — hold until exact string received over Serial.
  *
  * Example:
  *
@@ -35,6 +36,19 @@
 #define JUMP(target)               jump_(       target )
 #define CJUMP(cond, a, b)          cjump_(      []()->uint8_t{ return (uint8_t)(cond) ; }, a, b )
 #define TRANSITION(cond, target)   transition_( []()->uint8_t{ return (uint8_t)(cond) ; }, target )
+
+#define WAIT_SERIAL_COMMAND(cmd)   wait_( []()->uint8_t {                   \
+    static char    buf[16] = {} ;                                           \
+    static uint8_t idx     = 0  ;                                           \
+    while( Serial.available() ) {                                           \
+        char c = Serial.read() ;                                            \
+        if( c == '\n' || c == '\r' ) {                                      \
+            buf[idx] = '\0' ; idx = 0 ;                                     \
+            if( strcmp( buf, cmd ) == 0 ) return 1 ;                        \
+        } else if( idx < 15 ) { buf[idx++] = c ; }                         \
+    }                                                                       \
+    return 0 ;                                                              \
+} )
 
 class Simulator
 {
