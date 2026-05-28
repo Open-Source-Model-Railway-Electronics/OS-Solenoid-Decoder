@@ -57,20 +57,16 @@ void Logger::SubscribeBool_( uint8_t(*fn)(), const __FlashStringHelper* name )
     w.fn.boolFn = fn ;
     w.name      = name ;
     w.lastValue = 0xFF ;        // force fire on first read
-    w.lastTime  = 0 ;
-    w.interval  = 0 ;
     AddWatcher( w ) ;
 }
 
-void Logger::SubscribeVal_( uint32_t(*fn)(), const __FlashStringHelper* name, uint32_t interval )
+void Logger::SubscribeVal_( uint32_t(*fn)(), const __FlashStringHelper* name )
 {
     Watcher w ;
     w.type      = Watcher::VALUE ;
     w.fn.valFn  = fn ;
     w.name      = name ;
     w.lastValue = 0xFFFFFFFF ;  // force fire on first read
-    w.lastTime  = 0 ;
-    w.interval  = interval > 0 ? interval : defaultInterval ;
     AddWatcher( w ) ;
 }
 
@@ -89,15 +85,15 @@ void Logger::Unsubscribe_( const __FlashStringHelper* name )
 
 void Logger::SetInterval( uint32_t ms )
 {
-    defaultInterval = ms ;
-    for( uint8_t i = 0 ; i < nWatchers ; i++ )
-        if( watchers[i].type == Watcher::VALUE )
-            watchers[i].interval = ms ;
+    tickInterval = ms ;
 }
 
 void Logger::Log()
 {
     if( !watchers ) return ;
+
+    bool tick = ( millis() - lastTick >= tickInterval ) ;
+    if( tick ) lastTick = millis() ;
 
     for( uint8_t i = 0 ; i < nWatchers ; i++ )
     {
@@ -112,13 +108,12 @@ void Logger::Log()
                 notifyLog( w.name, val ) ;
             }
         }
-        else
+        else if( tick )
         {
             uint32_t val = w.fn.valFn() ;
-            if( val != w.lastValue && millis() - w.lastTime >= w.interval )
+            if( val != w.lastValue )
             {
                 w.lastValue = val ;
-                w.lastTime  = millis() ;
                 notifyLog( w.name, val ) ;
             }
         }
