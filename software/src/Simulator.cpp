@@ -58,6 +58,46 @@ void Simulator::transition_( uint8_t(*condition)(), uint8_t target )
     AddEvent( { SimEvent::TRANSITION, 0, condition, nullptr, nullptr, target, 0 } ) ;
 }
 
+#ifdef TRANSITIONS_ENABLED
+
+void Simulator::mtransition_( uint8_t(*c1)(), uint8_t t1,
+                               uint8_t(*c2)(), uint8_t t2 )
+{
+    SimEvent e = { SimEvent::MTRANSITION, 0, nullptr, nullptr, nullptr, 0, 0 } ;
+    e.branchCond[0] = c1 ; e.branchTarget[0] = t1 ;
+    e.branchCond[1] = c2 ; e.branchTarget[1] = t2 ;
+    e.nBranches = 2 ;
+    AddEvent( e ) ;
+}
+
+void Simulator::mtransition_( uint8_t(*c1)(), uint8_t t1,
+                               uint8_t(*c2)(), uint8_t t2,
+                               uint8_t(*c3)(), uint8_t t3 )
+{
+    SimEvent e = { SimEvent::MTRANSITION, 0, nullptr, nullptr, nullptr, 0, 0 } ;
+    e.branchCond[0] = c1 ; e.branchTarget[0] = t1 ;
+    e.branchCond[1] = c2 ; e.branchTarget[1] = t2 ;
+    e.branchCond[2] = c3 ; e.branchTarget[2] = t3 ;
+    e.nBranches = 3 ;
+    AddEvent( e ) ;
+}
+
+void Simulator::mtransition_( uint8_t(*c1)(), uint8_t t1,
+                               uint8_t(*c2)(), uint8_t t2,
+                               uint8_t(*c3)(), uint8_t t3,
+                               uint8_t(*c4)(), uint8_t t4 )
+{
+    SimEvent e = { SimEvent::MTRANSITION, 0, nullptr, nullptr, nullptr, 0, 0 } ;
+    e.branchCond[0] = c1 ; e.branchTarget[0] = t1 ;
+    e.branchCond[1] = c2 ; e.branchTarget[1] = t2 ;
+    e.branchCond[2] = c3 ; e.branchTarget[2] = t3 ;
+    e.branchCond[3] = c4 ; e.branchTarget[3] = t4 ;
+    e.nBranches = 4 ;
+    AddEvent( e ) ;
+}
+
+#endif
+
 // ─── Run / Reset ────────────────────────────────────────────────────────────
 
 void Simulator::Run()
@@ -95,6 +135,19 @@ void Simulator::Run()
         if( e.condition() )
             JumpTo( e.targetA ) ;
         break ;
+
+#ifdef TRANSITIONS_ENABLED
+    case SimEvent::MTRANSITION:
+        for( uint8_t i = 0 ; i < e.nBranches ; i++ )
+        {
+            if( e.branchCond[i]() )
+            {
+                JumpTo( e.branchTarget[i] ) ;
+                break ;
+            }
+        }
+        break ;
+#endif
     }
 }
 
