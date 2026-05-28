@@ -43,8 +43,10 @@ void CoilDriver::begin( uint8 _A, uint8 _B )
 {
     pinA = _A ;
     pinB = _B ;
-    lockoutTimer.setTime( 1000 ) ; // 'debounce' lockout time for repetetive DCC messages.
-} 
+    lockoutTimer.set( TIMER_ON, 1000 ) ; // 'debounce' lockout time for repetetive DCC messages.
+    trigA.arm() ;
+    trigB.arm() ;
+}
 
 void CoilDriver::initializeCoils()
 {
@@ -167,23 +169,30 @@ uint8 CoilDriver::update()
         }
     }
 
-    if( riseA.trigger( outputStateA ) ) { turn( pinA, ON ) ; } // rising flank -> set output
-    if( riseB.trigger( outputStateB ) ) { turn( pinB, ON ) ; }
+    trigA.update( outputStateA ) ;
+    trigB.update( outputStateB ) ;
 
-    if( fallA.trigger( outputStateA ) ) { turn( pinA, OFF ) ; } // falling flank -> kill output
-    if( fallB.trigger( outputStateB ) ) { turn( pinB, OFF ) ; }
+    bool rArose = trigA.rose() ; // capture before buddy-pin section; rose()/fell() clear-on-read
+    bool fAfell = trigA.fell() ;
+    bool rBrose = trigB.rose() ;
+    bool fBfell = trigB.fell() ;
+
+    if( rArose ) { turn( pinA, ON  ) ; } // rising flank  -> set output
+    if( rBrose ) { turn( pinB, ON  ) ; }
+    if( fAfell ) { turn( pinA, OFF ) ; } // falling flank -> kill output
+    if( fBfell ) { turn( pinB, OFF ) ; }
 
     // this part handles the buddy pins for DOUBLE_PULSE_W_FROG mode
-    if( type == DOUBLE_PULSE_W_FROG ) 
+    if( type == DOUBLE_PULSE_W_FROG )
     {
-        if( riseA.Q || riseB.Q )  // if either state becomes true, kill both relay pins
+        if( rArose || rBrose )   // if either coil fires, de-energise both frog relay pins first
         {
             digitalWrite( buddyPinA, LOW ) ;
             digitalWrite( buddyPinB, LOW ) ;
         }
 
-        if( fallA.Q ) { digitalWrite( buddyPinA, HIGH ) ; } // the pulse has finished and one of the relay pins may be set.
-        if( fallB.Q ) { digitalWrite( buddyPinB, HIGH ) ; }
+        if( fAfell ) { digitalWrite( buddyPinA, HIGH ) ; } // pulse finished -> latch the relay
+        if( fBfell ) { digitalWrite( buddyPinB, HIGH ) ; }
     }
 
     if( type == DOUBLE_COIL_PULSED || type == DOUBLE_PULSE_W_FROG ) // double pulse coils, may only return true when deactivated.
@@ -204,8 +213,8 @@ uint8_t CoilDriver::setCoilExt( uint16 dccAddress, uint8 _aspect )
     uint16  secondaryAddress = primaryAddress + 1 ;
     uint32         pulseTime = _aspect * 1000 ; // aspect number is used for pulse length in seconds.
 
-    if( dccAddress ==   primaryAddress ) { timerA.setTime( pulseTime ) ; state2beA = 1 ; return 1 ; }
-    if( dccAddress == secondaryAddress ) { timerB.setTime( pulseTime ) ; state2beB = 1 ; return 1 ; }
+    if( dccAddress ==   primaryAddress ) { timerA.set( TIMER_ON, pulseTime ) ; state2beA = 1 ; return 1 ; }
+    if( dccAddress == secondaryAddress ) { timerB.set( TIMER_ON, pulseTime ) ; state2beB = 1 ; return 1 ; }
 
     return 0 ;
 }
@@ -267,8 +276,8 @@ uint32 CoilDriver::getPulseTime() { return myPulseTime ; }
 void   CoilDriver::setPulseTime( uint32 _pulseTime )
 {
     myPulseTime = _pulseTime ;
-    timerA.setTime( myPulseTime ) ;
-    timerB.setTime( myPulseTime ) ;
+    timerA.set( TIMER_ON, myPulseTime ) ;
+    timerB.set( TIMER_ON, myPulseTime ) ;
 }
 
 void   CoilDriver::setDutyCycle( uint8_t _dutycycle ) { dutycycle = _dutycycle ; }
@@ -285,8 +294,8 @@ void CoilDriver::recover()
 
     // Reset trigger memory so the 0 -> desired-state edges are detected on
     // the very next update() call instead of being silently swallowed.
-    riseA.old = 0 ;  fallA.old = 0 ;
-    riseB.old = 0 ;  fallB.old = 0 ;
+    trigA.state = 0 ;
+    trigB.state = 0 ;
 
     // For continuous types: reload state2be from the last saved state so
     // update() will immediately transition the output back on.

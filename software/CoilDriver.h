@@ -3,8 +3,7 @@
 
 #include <Arduino.h>
 #include "src/macros.h"
-#include "src/Trigger.h"
-#include "src/Timers.h"
+#include "src/ST.h"
 
 enum types
 {
@@ -67,16 +66,12 @@ private:
     uint8   lockout         :  1 ;
     uint8   dutycycle       :  4 ;
 
-    R_trigger riseA ;
-    R_trigger riseB ;
-    
-    F_trigger fallA ;
-    F_trigger fallB ;
-    
-    T_ON timerA ;
-    T_ON timerB ;
-    
-    T_ON  lockoutTimer ;
+    Trigger trigA ;
+    Trigger trigB ;
+
+    Timer timerA ;
+    Timer timerB ;
+    Timer lockoutTimer ;
     
     void  turn( uint8, uint8 ) ;
 } ;

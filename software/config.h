@@ -1,5 +1,8 @@
 #include <Arduino.h>
 
+#ifndef CONFIG_H
+#define CONFIG_H
+
 const int nCoils        =  8 ;
 
 const int GPIO[] =
@@ -33,3 +36,4 @@ const int leftLedPin    = 13 ;
 const int currentSensePin = A6 ;
 const int coilVoltagePin  = A7 ;
 
+#endif

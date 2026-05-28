@@ -1,5 +1,7 @@
 #include "CoilManager.h"
 
+CoilRecord coilSettings[nCoils] ;
+
 void saveCoils()
 {
     for( int i = 0 ; i < nCoils ; i ++ )

@@ -17,11 +17,11 @@ uint8_t addressReceived()
 void config()
 {
     static uint8_t   nextState = 0 ;
-    static R_trigger menu1 ; // -> get address OR get index for address
-    static R_trigger menu2 ; // -> get index for type
-    static R_trigger menu3 ; // -> get index for pulse length
-    static R_trigger menu4 ; // -> enable PWM dutycycle
-    static R_trigger menu5 ; // -> option menu
+    static Trigger menu1 ; // -> get address OR get index for address
+    static Trigger menu2 ; // -> get index for type
+    static Trigger menu3 ; // -> get index for pulse length
+    static Trigger menu4 ; // -> enable PWM dutycycle
+    static Trigger menu5 ; // -> option menu
 
     REPEAT_MS( 20 )
     {
@@ -47,15 +47,22 @@ void config()
             state         = checkButton ;
             nextState     = setBaseAddress ;
             newAddressSet = 0 ;
+            menu1.arm() ; menu2.arm() ; menu3.arm() ; menu4.arm() ; menu5.arm() ;
         }
         break ;
 
     case checkButton:
-        if( menu1.trigger( millis() - beginTime >     1 ) ) { nextState = setBaseAddress     ; rightLed.setEventBleeps(1) ; }
-        if( menu2.trigger( millis() - beginTime >  2000 ) ) { nextState = setIndex4Type      ; rightLed.setEventBleeps(2) ; }
-        if( menu3.trigger( millis() - beginTime >  4000 ) ) { nextState = setIndex4pulse     ; rightLed.setEventBleeps(3) ; }
-        if( menu4.trigger( millis() - beginTime >  6000 ) ) { nextState = setIndex4dutyCycle ; rightLed.setEventBleeps(4) ; }
-        if( menu5.trigger( millis() - beginTime >  8000 ) ) { nextState = configMode         ; rightLed.setEventBleeps(5) ; }
+        menu1.update( millis() - beginTime >     1 ) ;
+        menu2.update( millis() - beginTime >  2000 ) ;
+        menu3.update( millis() - beginTime >  4000 ) ;
+        menu4.update( millis() - beginTime >  6000 ) ;
+        menu5.update( millis() - beginTime >  8000 ) ;
+
+        if( menu1.rose() ) { nextState = setBaseAddress     ; rightLed.setEventBleeps(1) ; }
+        if( menu2.rose() ) { nextState = setIndex4Type      ; rightLed.setEventBleeps(2) ; }
+        if( menu3.rose() ) { nextState = setIndex4pulse     ; rightLed.setEventBleeps(3) ; }
+        if( menu4.rose() ) { nextState = setIndex4dutyCycle ; rightLed.setEventBleeps(4) ; }
+        if( menu5.rose() ) { nextState = configMode         ; rightLed.setEventBleeps(5) ; }
 
         if( btnState == RISING ) { state = nextState ; }
         break ;
@@ -181,6 +188,7 @@ void config()
             {
                 coil[i].setDutyCycle( receivedAddress ) ;
             }
+            saveCoils() ;
             state = setIndex4dutyCycle ;
         }
         break ;

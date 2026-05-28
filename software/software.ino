@@ -8,8 +8,7 @@
 #include "DccCallbacks.h"
 #include "pwm.h"
 #include "src/debounceClass.h"
-#include "src/Trigger.h"
-#include "src/Timers.h"
+#include "src/ST.h"
 #include <EEPROM.h>
 #include "src/LedBlink.h"
 #include "src/Logger.h"
@@ -53,7 +52,7 @@ Logger      logger ;
 Simulator   sim ;
 LedBlink    rightLed( rightLedPin ) ;
 LedBlink    leftLed(  leftLedPin  ) ;
-BlinkTimer  commitStates ;
+Timer       commitStates ;
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 Settings defaultSettings =
@@ -68,7 +67,7 @@ Settings defaultSettings =
 
 Settings settings ;
 
-CoilRecord coilSettings[nCoils] ;
+
 
 // ── Config menu state ─────────────────────────────────────────────────────────
 uint8_t              state     = idle ;
@@ -129,7 +128,9 @@ void saveStates()
 
 void updateCduVoltage()
 {
-    static BlinkTimer timer( 2000 ) ;
+    static Timer timer ;
+    static bool  timerInit = false ;
+    if( !timerInit ) { timer.set( TIMER_BLEEP, 2000 ) ; timerInit = true ; }
     if( timer.update(1) )
     {
         uint16_t voltage = analogRead( coilVoltagePin ) ;
@@ -168,7 +169,7 @@ void setup()
 {
     Serial.begin( 115200 ) ;
 
-    commitStates.setTime( 1000 ) ;
+    commitStates.set( TIMER_BLEEP, 1000 ) ;
     configButton.begin( configPin ) ;
 
     for( int i = 0 ; i < nGpio ; i ++ )

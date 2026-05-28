@@ -74,6 +74,7 @@ void unsubscribePwm(uint8_t digitalPin)
     {
         if( pwmPins[i].pin == digitalPin )
         {
+            *pwmPins[i].portReg &= ~pwmPins[i].bitmask ;
             pwmPins[i].pin = INACTIVE; 
             return;
         }
