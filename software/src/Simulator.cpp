@@ -26,48 +26,36 @@ void Simulator::JumpTo( uint8_t target )
     lastTime = millis() ;
 }
 
-void Simulator::PrintMsg( const SimEvent& e )
-{
-    if( !e.message ) return ;
-    if( e.msgInFlash ) Serial.println( (const __FlashStringHelper*)e.message ) ;
-    else               Serial.println( e.message ) ;
-}
-
 // ─── public ─────────────────────────────────────────────────────────────────
-
-void Simulator::add_( uint32_t interval, const char* message, void(*action)() )
-{
-    AddEvent( { SimEvent::TIMED, interval, nullptr, message, false, action, 0, 0 } ) ;
-}
 
 void Simulator::add_( uint32_t interval, const __FlashStringHelper* message, void(*action)() )
 {
-    AddEvent( { SimEvent::TIMED, interval, nullptr, (const char*)message, true, action, 0, 0 } ) ;
+    AddEvent( { SimEvent::TIMED, interval, nullptr, message, action, 0, 0 } ) ;
 }
 
 void Simulator::add_( uint32_t interval, decltype(nullptr), void(*action)() )
 {
-    AddEvent( { SimEvent::TIMED, interval, nullptr, nullptr, false, action, 0, 0 } ) ;
+    AddEvent( { SimEvent::TIMED, interval, nullptr, nullptr, action, 0, 0 } ) ;
 }
 
 void Simulator::wait_( uint8_t(*condition)() )
 {
-    AddEvent( { SimEvent::WAIT, 0, condition, nullptr, false, nullptr, 0, 0 } ) ;
+    AddEvent( { SimEvent::WAIT, 0, condition, nullptr, nullptr, 0, 0 } ) ;
 }
 
 void Simulator::jump_( uint8_t target )
 {
-    AddEvent( { SimEvent::JUMP, 0, nullptr, nullptr, false, nullptr, target, 0 } ) ;
+    AddEvent( { SimEvent::JUMP, 0, nullptr, nullptr, nullptr, target, 0 } ) ;
 }
 
 void Simulator::cjump_( uint8_t(*condition)(), uint8_t onFalse, uint8_t onTrue )
 {
-    AddEvent( { SimEvent::CJUMP, 0, condition, nullptr, false, nullptr, onFalse, onTrue } ) ;
+    AddEvent( { SimEvent::CJUMP, 0, condition, nullptr, nullptr, onFalse, onTrue } ) ;
 }
 
 void Simulator::transition_( uint8_t(*condition)(), uint8_t target )
 {
-    AddEvent( { SimEvent::TRANSITION, 0, condition, nullptr, false, nullptr, target, 0 } ) ;
+    AddEvent( { SimEvent::TRANSITION, 0, condition, nullptr, nullptr, target, 0 } ) ;
 }
 
 // ─── Run / Reset ────────────────────────────────────────────────────────────
@@ -84,8 +72,8 @@ void Simulator::Run()
         if( millis() - lastTime >= e.interval )
         {
             lastTime = millis() ;
-            PrintMsg( e ) ;
-            if( e.action ) e.action() ;
+            if( e.message ) Serial.println( e.message ) ;
+            if( e.action  ) e.action() ;
             current++ ;
         }
         break ;
